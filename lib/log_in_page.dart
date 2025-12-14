@@ -16,48 +16,39 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
 
     return Scaffold(
-      backgroundColor: ColorsApp().backgroundColor,
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 80),
+              Image.asset('images/iconaApp.png', width: 300, height: 300),
+
               Text(
-                'VISTA',
-                textAlign: TextAlign.start,
-                style: TextStyle(
-                  color: ColorsApp().primaryTextColor,
-                  fontSize: 40,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-              Text(
-                'Il tuo mondo di ',
+                'Il tuo mondo di Panorami.',
                 textAlign: TextAlign.start,
                 style: TextStyle(
                   color: ColorsApp().secondaryTextColor,
                   fontSize: 16,
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
               TextField(
                 style: TextStyle(color: ColorsApp().primaryTextColor),
                 decoration: InputDecoration(
                   labelText: 'Email',
                   labelStyle: TextStyle(color: ColorsApp().secondaryTextColor),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(30),
                     borderSide: BorderSide(
-                      color: ColorsApp().textFieldBorderColor,
+                      color: ColorsApp().secondaryTextColor,
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.white),
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide:  BorderSide(color: ColorsApp().secondaryTextColor),
                   ),
                 ),
                 keyboardType: TextInputType.emailAddress,
@@ -70,14 +61,14 @@ class _LoginPageState extends State<LoginPage> {
                   labelText: 'Password',
                   labelStyle: TextStyle(color: ColorsApp().secondaryTextColor),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(30),
                     borderSide: BorderSide(
-                      color: ColorsApp().textFieldBorderColor,
+                      color: ColorsApp().secondaryTextColor,
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.white),
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide:  BorderSide(color: ColorsApp().secondaryTextColor),
                   ),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -100,7 +91,7 @@ class _LoginPageState extends State<LoginPage> {
                   backgroundColor: ColorsApp().buttonColor,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(30),
                   ),
                 ),
                 onPressed: () {
@@ -111,42 +102,19 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   );
                 },
-                child: Text(
-                  'Accedi',
-                  style: TextStyle(
-                    color: ColorsApp().buttonTextColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                child: Container(
+                  width: MediaQuery.of(context).size.width * 0.7,
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Accedi',
+                    style: TextStyle(
+                      color: ColorsApp().primary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
-              // const SizedBox(height: 20),
-              // Row(
-              //   mainAxisAlignment: MainAxisAlignment.center,
-              //   children: [
-              //     TextButton(
-              //       onPressed: () {
-              //         Navigator.push(
-              //           context,
-              //           MaterialPageRoute(builder: (context) => const HomePage(title: "Vista")),
-              //         );
-              //       },
-              //       child:  Text(
-              //         "Don't have to account? Sign Up",
-              //         style: TextStyle(color: ColorsApp().secondaryTextColor),
-              //       ),
-              //     ),
-              //   ],
-              // ),
-              // TextButton(
-              //   onPressed: () {
-              //     // TODO: Naviga alla pagina di recupero password
-              //   },
-              //   child: Text(
-              //     'Forgot Password?',
-              //     style: TextStyle(color: ColorsApp().secondaryTextColor),
-              //   ),
-              // ),
             ],
           ),
         ),
