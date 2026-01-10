@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:vista/log_in_page.dart';
 
-import 'HomePage.dart';
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-void main() {
   runApp(const MyApp());
 }
 
@@ -14,11 +14,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Vista',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.white),
-      ),
+      theme: ThemeData(primarySwatch: Colors.blue),
       home: const LoginPage(),
-      debugShowCheckedModeBanner: false,
     );
   }
 }

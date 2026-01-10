@@ -14,7 +14,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -48,7 +47,9 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(30),
-                    borderSide:  BorderSide(color: ColorsApp().secondaryTextColor),
+                    borderSide: BorderSide(
+                      color: ColorsApp().secondaryTextColor,
+                    ),
                   ),
                 ),
                 keyboardType: TextInputType.emailAddress,
@@ -68,7 +69,9 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(30),
-                    borderSide:  BorderSide(color: ColorsApp().secondaryTextColor),
+                    borderSide: BorderSide(
+                      color: ColorsApp().secondaryTextColor,
+                    ),
                   ),
                   suffixIcon: IconButton(
                     icon: Icon(
