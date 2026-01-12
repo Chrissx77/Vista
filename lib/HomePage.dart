@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:vista/auth/auth_client.dart';
+import 'package:vista/auth/auth_gate.dart';
 import 'package:vista/log_in_page.dart';
 import 'package:vista/utility/ColorsApp.dart';
 
@@ -18,18 +20,16 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         backgroundColor: ColorsApp().primary,
         title: Text(widget.title, style: TextStyle(color: Colors.white)),
-      actions: [
-        IconButton(onPressed: (){
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const LoginPage(),
-            ),
-          );
-        }, icon: Icon(Icons.logout, color: ColorsApp().primaryTextColor,))
-      ],
+        actions: [
+          IconButton(
+            onPressed: () async {
+              await AuthService().signOut();
+            },
+            icon: Icon(Icons.logout, color: ColorsApp().primaryTextColor),
+          ),
+        ],
       ),
-      
+
       body: Placeholder(),
     );
   }
