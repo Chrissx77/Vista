@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vista/auth/auth_gate.dart';
 import 'package:vista/log_in_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vista/utility/ColorsApp.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +23,21 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Vista',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: ColorsApp.primary,
+          primary: ColorsApp.primary,
+          secondary: ColorsApp.secondary,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: ColorsApp.buttonColor,
+            foregroundColor: ColorsApp.secondary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          ),
+        ),
+      ),
       home: AuthGate(),
     );
   }

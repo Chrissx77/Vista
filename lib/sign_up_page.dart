@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:vista/base_client.dart';
-import 'package:vista/sign_up_page.dart';
 import 'package:vista/utility/ColorsApp.dart';
 import 'auth/auth_client.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+class SignUpPage extends StatefulWidget {
+  const SignUpPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<SignUpPage> createState() => _SignUpPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _SignUpPageState extends State<SignUpPage> {
   bool _isPasswordVisible = false;
 
   // Controller per recuperare i dati inseriti
@@ -55,8 +54,12 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: ColorsApp.primary),
+      ),
       backgroundColor: Colors.white,
-      // SingleChildScrollView evita l'errore di overflow quando appare la tastiera
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -65,39 +68,22 @@ class _LoginPageState extends State<LoginPage> {
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(height: 20),
-                // Logo App
-                Image.asset(
-                  'images/iconaApp.png',
-                  width: 250,
-                  height: 250,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(
-                      Icons.image_not_supported,
-                      size: 100,
-                      color: Colors.grey,
-                    );
-                  },
-                ),
-
+                const SizedBox(height: 40),
                 Text(
-                  'Un nuovo punto di Vista.',
+                  "MODULO REGISTRAZIONE",
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: ColorsApp.secondaryTextColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
+                    color: ColorsApp.primary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-
                 const SizedBox(height: 40),
 
                 // Campo Email
                 TextField(
                   controller: emailController,
-                  // DECOMMENTATO: fondamentale per il login
                   style: const TextStyle(color: Colors.black),
-                  // Testo Nero per visibilità
                   decoration: InputDecoration(
                     labelText: 'Email',
                     labelStyle: const TextStyle(color: Colors.black54),
@@ -162,44 +148,6 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 40),
 
-                // Pulsante Accedi
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ColorsApp.buttonColor,
-                    elevation: 2,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  onPressed: login,
-                  child: SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.7,
-                    child: Center(
-                      child: Text(
-                        'Accedi'.toUpperCase(),
-                        style: TextStyle(
-                          color: ColorsApp.primary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 40),
-
-                Text(
-                  'Non hai ancora un account?',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: ColorsApp.secondaryTextColor,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 10),
-
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: ColorsApp.buttonColor,
@@ -210,12 +158,29 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   onPressed: () async {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SignUpPage(),
-                      ),
-                    );
+                    try {
+                      await AuthService().signUp(
+                        emailController.text.trim(),
+                        passwordController.text.trim(),
+                      );
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("Registrazione avvenuta con successo."),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                      Navigator.pop(context);
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(e.toString()),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                      }
+                    }
                   },
                   child: SizedBox(
                     width: MediaQuery.of(context).size.width * 0.7,
