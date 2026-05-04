@@ -1,6 +1,10 @@
 /// Configurazione Supabase letta a **compile-time** (`String.fromEnvironment`).
 ///
-/// Avvio in locale (consigliato):
+/// In Cursor/VS Code le define vengono passate da `.vscode/settings.json`
+/// (`dart.flutterRunAdditionalArgs`). All’apertura del progetto, se manca il
+/// file, viene creato da `dart_defines.example.json` (task automatico).
+///
+/// Da terminale:
 /// `flutter run --dart-define-from-file=dart_defines.local.json`
 ///
 /// In alternativa:

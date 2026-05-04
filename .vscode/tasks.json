@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Vista: ensure dart_defines.local.json",
+      "type": "shell",
+      "osx": {
+        "command": "test -f dart_defines.local.json || cp dart_defines.example.json dart_defines.local.json"
+      },
+      "linux": {
+        "command": "test -f dart_defines.local.json || cp dart_defines.example.json dart_defines.local.json"
+      },
+      "windows": {
+        "command": "if not exist dart_defines.local.json copy dart_defines.example.json dart_defines.local.json"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "showReuseMessage": false
+      },
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    }
+  ]
+}

@@ -2,13 +2,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Vista (dart_defines.local.json)",
+      "name": "Vista",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
-      "toolArgs": [
-        "--dart-define-from-file=${workspaceFolder}/dart_defines.local.json"
-      ]
+      "preLaunchTask": "Vista: ensure dart_defines.local.json"
     }
   ]
 }
