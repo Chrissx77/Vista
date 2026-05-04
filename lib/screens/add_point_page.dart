@@ -1,8 +1,10 @@
-import 'dart:typed_data';
+import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:vista/models/pointview.dart';
 import 'package:vista/providers.dart';
 import 'package:vista/services/pointview_images.dart';
@@ -31,8 +33,35 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
   final _longitude = TextEditingController();
 
   final List<_PickedImage> _picked = [];
+  final ImagePicker _picker = ImagePicker();
 
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostPicks());
+  }
+
+  /// Android può terminare l’app mentre la galleria è aperta: recupera il risultato.
+  Future<void> _recoverLostPicks() async {
+    final response = await _picker.retrieveLostData();
+    if (!mounted || response.isEmpty) return;
+    final files = response.files;
+    if (files == null || files.isEmpty) return;
+    await _appendFromXFiles(files);
+  }
+
+  Future<void> _appendFromXFiles(List<XFile> files) async {
+    final add = <_PickedImage>[];
+    for (final x in files) {
+      if (_picked.length + add.length >= 3) break;
+      final bytes = await x.readAsBytes();
+      add.add(_PickedImage(x, bytes));
+    }
+    if (add.isEmpty) return;
+    setState(() => _picked.addAll(add));
+  }
 
   @override
   void dispose() {
@@ -70,25 +99,60 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
     return null;
   }
 
-  Future<void> _addFromGallery() async {
+  Future<bool> _ensureCameraPermission() async {
+    if (kIsWeb) return true;
+    if (!Platform.isIOS && !Platform.isAndroid) return true;
+    final status = await Permission.camera.request();
+    if (status.isGranted) return true;
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Serve il permesso fotocamera per scattare.'),
+        action: SnackBarAction(
+          label: 'Impostazioni',
+          onPressed: openAppSettings,
+        ),
+      ),
+    );
+    return false;
+  }
+
+  /// Apre la **galleria nativa** del telefono (un’immagine per volta, fino a 3).
+  Future<void> _addOneFromGallery() async {
     final remaining = 3 - _picked.length;
     if (remaining <= 0) return;
-    final list = await ImagePicker().pickMultiImage(imageQuality: 85);
+
+    final x = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      requestFullMetadata: false,
+    );
+    if (!mounted || x == null) return;
+    final bytes = await x.readAsBytes();
+    setState(() => _picked.add(_PickedImage(x, bytes)));
+  }
+
+  /// Seleziona più foto in un solo passaggio (dove supportato dal dispositivo).
+  Future<void> _addMultipleFromGallery() async {
+    final remaining = 3 - _picked.length;
+    if (remaining <= 0) return;
+
+    final list = await _picker.pickMultiImage(
+      imageQuality: 85,
+      requestFullMetadata: false,
+    );
     if (!mounted || list.isEmpty) return;
-    final add = <_PickedImage>[];
-    for (final x in list) {
-      if (_picked.length + add.length >= 3) break;
-      final bytes = await x.readAsBytes();
-      add.add(_PickedImage(x, bytes));
-    }
-    setState(() => _picked.addAll(add));
+    await _appendFromXFiles(list);
   }
 
   Future<void> _addFromCamera() async {
     if (_picked.length >= 3) return;
-    final x = await ImagePicker().pickImage(
+    if (!await _ensureCameraPermission()) return;
+
+    final x = await _picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 85,
+      requestFullMetadata: false,
     );
     if (!mounted || x == null) return;
     final bytes = await x.readAsBytes();
@@ -191,7 +255,7 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
             Text('Immagini', style: textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
-              'Da 1 a 3 foto del punto.',
+              'Da 1 a 3 foto. «Apri galleria» apre l’album del telefono (una foto per volta).',
               style: textTheme.bodySmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),
@@ -239,10 +303,18 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
                   ),
                 if (_picked.length < 3) ...[
                   FilledButton.tonalIcon(
-                    onPressed: _saving ? null : _addFromGallery,
+                    onPressed: _saving ? null : _addOneFromGallery,
                     icon: const Icon(Icons.photo_library_outlined),
-                    label: Text(_picked.isEmpty ? 'Scegli foto' : 'Aggiungi foto'),
+                    label: Text(
+                      _picked.isEmpty ? 'Apri galleria' : 'Aggiungi dalla galleria',
+                    ),
                   ),
+                  if (_picked.length < 2)
+                    TextButton.icon(
+                      onPressed: _saving ? null : _addMultipleFromGallery,
+                      icon: const Icon(Icons.collections_outlined),
+                      label: const Text('Scegli più foto insieme'),
+                    ),
                   OutlinedButton.icon(
                     onPressed: _saving ? null : _addFromCamera,
                     icon: const Icon(Icons.camera_alt_outlined),
