@@ -1,15 +1,38 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vista/screens/auth_gate.dart';
+import 'package:vista/supabase_env.dart';
 import 'package:vista/utility/colors_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (!SupabaseEnv.isConfigured) {
+    final msg = SupabaseEnv.missingConfigMessage;
+    if (kReleaseMode) {
+      throw StateError(msg);
+    }
+    debugPrint(msg);
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: SelectableText(msg),
+            ),
+          ),
+        ),
+      ),
+    );
+    return;
+  }
+
   await Supabase.initialize(
-    url: 'https://iutwiokumxyhvdaqgdwg.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1dHdpb2t1bXh5aHZkYXFnZHdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3NDE5NzUsImV4cCI6MjA4MTMxNzk3NX0.OAHaFS22BIN3DPMizy98s9j7dnRvC1u9hmTs7cLZeNw',
+    url: SupabaseEnv.supabaseUrl,
+    anonKey: SupabaseEnv.supabaseAnonKey,
   );
 
   runApp(const ProviderScope(child: MyApp()));

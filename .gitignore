@@ -1,6 +1,11 @@
 # Local MCP / tooling temp files
 .tmp_apply_migration.json
 
+# Supabase / Flutter: non committare chiavi (usa dart_defines.example.json come modello)
+dart_defines.local.json
+.env
+.env.*
+
 # Miscellaneous
 *.class
 *.log

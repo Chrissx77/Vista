@@ -20,7 +20,7 @@ class BaseClient {
   }
 
   Future<void> sendPointview(Pointview pointview) async {
-    final url = Uri.parse('$baseUrl${API}sendPointview');
+    final url = Uri.parse('$baseUrl${functionsApiPath}sendPointview');
     final response = await http.post(
       url,
       headers: _headers(),
@@ -45,7 +45,7 @@ class BaseClient {
 
   Future<List<Pointview>> getPointview() async {
     List<Pointview> pointViews = [];
-    final url = Uri.parse('$baseUrl${API}getPointview');
+    final url = Uri.parse('$baseUrl${functionsApiPath}getPointview');
     try {
       final response = await http.get(url, headers: _headers());
 
@@ -70,7 +70,7 @@ class BaseClient {
 
   Future<Pointview?> getPointviewById(int id) async {
     final url = Uri.parse(
-      '$baseUrl${API}getPointviewById',
+      '$baseUrl${functionsApiPath}getPointviewById',
     ).replace(queryParameters: {'id': id.toString()});
     try {
       final response = await http.get(url, headers: _headers());
@@ -91,7 +91,7 @@ class BaseClient {
   }
 
   Future<Profile?> getProfile() async {
-    final url = Uri.parse('$baseUrl${API}getProfile');
+    final url = Uri.parse('$baseUrl${functionsApiPath}getProfile');
     try {
       final response = await http.get(url, headers: _headers());
       if (response.statusCode == 200) {
