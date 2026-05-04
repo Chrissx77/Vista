@@ -43,13 +43,20 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostPicks());
   }
 
-  /// Android può terminare l’app mentre la galleria è aperta: recupera il risultato.
+  /// Su Android, se il sistema chiude l’app con la galleria aperta, qui si recuperano le foto.
+  /// Su web / iOS / desktop `retrieveLostData` può non essere implementato: ignoriamo.
   Future<void> _recoverLostPicks() async {
-    final response = await _picker.retrieveLostData();
-    if (!mounted || response.isEmpty) return;
-    final files = response.files;
-    if (files == null || files.isEmpty) return;
-    await _appendFromXFiles(files);
+    if (kIsWeb) return;
+
+    try {
+      final response = await _picker.retrieveLostData();
+      if (!mounted || response.isEmpty) return;
+      final files = response.files;
+      if (files == null || files.isEmpty) return;
+      await _appendFromXFiles(files);
+    } on UnimplementedError {
+      return;
+    }
   }
 
   Future<void> _appendFromXFiles(List<XFile> files) async {
