@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vista/models/pointview.dart';
 import 'package:vista/providers.dart';
+import 'package:vista/widgets/point_image_carousel.dart';
 
 /// Dettaglio di un punto panoramico (T4).
 class PointDetailPage extends ConsumerWidget {
@@ -37,6 +38,10 @@ class PointDetailPage extends ConsumerWidget {
           body: ListView(
             padding: const EdgeInsets.all(20),
             children: [
+              if (p.imageUrls.isNotEmpty) ...[
+                PointImageCarousel(urls: p.imageUrls),
+                const SizedBox(height: 20),
+              ],
               if (subtitle.trim().isNotEmpty) ...[
                 Text('Località', style: textTheme.titleSmall),
                 const SizedBox(height: 4),

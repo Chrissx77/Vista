@@ -46,6 +46,17 @@ Deno.serve(async (req) => {
   const lat = body["latitude"];
   const lng = body["longitude"];
 
+  const rawUrls = body["image_urls"];
+  if (!Array.isArray(rawUrls)) {
+    return json({ error: "image_urls deve essere un array di stringhe (URL)" }, 400);
+  }
+  const image_urls = rawUrls
+    .map((u) => String(u).trim())
+    .filter((u) => u.length > 0);
+  if (image_urls.length < 1 || image_urls.length > 3) {
+    return json({ error: "Servono tra 1 e 3 immagini (URL dopo upload su Storage)" }, 400);
+  }
+
   const { error: insertError } = await supabase.from("point_views").insert({
     name,
     region,
@@ -58,6 +69,7 @@ Deno.serve(async (req) => {
       ? null
       : Number(lng),
     created_by: user.id,
+    image_urls,
   });
 
   if (insertError) {

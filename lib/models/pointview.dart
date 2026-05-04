@@ -9,6 +9,9 @@ class Pointview {
   String? createdBy;
   String? creatorDisplayName;
 
+  /// URL pubblici delle immagini (max 3), ordine = carosello.
+  List<String> imageUrls = [];
+
   Pointview();
 
   factory Pointview.fromJson(Map<String, dynamic> json) {
@@ -34,6 +37,14 @@ class Pointview {
       pointview.creatorDisplayName = cdn.toString();
     }
 
+    final rawImages = json['image_urls'];
+    if (rawImages is List) {
+      pointview.imageUrls = rawImages
+          .map((e) => e?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+    }
+
     return pointview;
   }
 
@@ -45,6 +56,7 @@ class Pointview {
       if (description != null) 'description': description,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
+      'image_urls': imageUrls,
     };
   }
 }
