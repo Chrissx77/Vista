@@ -223,19 +223,16 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
       ref.invalidate(pointviewsProvider);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Punto creato.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Punto creato.')));
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
       final scheme = Theme.of(context).colorScheme;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            e.toString(),
-            style: TextStyle(color: scheme.onError),
-          ),
+          content: Text(e.toString(), style: TextStyle(color: scheme.onError)),
           backgroundColor: scheme.error,
           behavior: SnackBarBehavior.floating,
         ),
@@ -251,9 +248,7 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nuovo punto panoramico'),
-      ),
+      appBar: AppBar(title: const Text('Nuovo punto panoramico')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -313,7 +308,9 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
                     onPressed: _saving ? null : _addOneFromGallery,
                     icon: const Icon(Icons.photo_library_outlined),
                     label: Text(
-                      _picked.isEmpty ? 'Apri galleria' : 'Aggiungi dalla galleria',
+                      _picked.isEmpty
+                          ? 'Apri galleria'
+                          : 'Aggiungi dalla galleria',
                     ),
                   ),
                   if (_picked.length < 2)
@@ -334,9 +331,7 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
             TextFormField(
               controller: _name,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Nome del punto',
-              ),
+              decoration: const InputDecoration(labelText: 'Nome del punto'),
               validator: (v) => _required(v, 'Nome'),
               textInputAction: TextInputAction.next,
             ),
@@ -344,9 +339,7 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
             TextFormField(
               controller: _region,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Regione',
-              ),
+              decoration: const InputDecoration(labelText: 'Regione'),
               validator: (v) => _required(v, 'Regione'),
               textInputAction: TextInputAction.next,
             ),
@@ -354,9 +347,7 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
             TextFormField(
               controller: _city,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Città',
-              ),
+              decoration: const InputDecoration(labelText: 'Città'),
               validator: (v) => _required(v, 'Città'),
               textInputAction: TextInputAction.next,
             ),
