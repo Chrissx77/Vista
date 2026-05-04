@@ -24,6 +24,7 @@ else
   echo "==> Salto db push (nessun SUPABASE_DB_PASSWORD)."
   echo "    Per applicare le migrazioni: export SUPABASE_DB_PASSWORD='…' e rilancia,"
   echo "    oppure incolla supabase/migrations/*.sql nel SQL Editor del dashboard."
+  echo "    Se l’app dà «Bucket not found»: esegui anche supabase/fix_storage_bucket.sql"
 fi
 
 echo "==> Edge Functions (--project-ref $REF)…"

@@ -47,14 +47,29 @@ Future<List<String>> uploadPointviewImages(List<XFile> files) async {
     if (ext.isEmpty) ext = 'jpg';
 
     final path = '$uid/${stamp}_$i.$ext';
-    await bucket.uploadBinary(
-      path,
-      bytes,
-      fileOptions: FileOptions(
-        contentType: _contentTypeForExtension(ext),
-        upsert: false,
-      ),
-    );
+    try {
+      await bucket.uploadBinary(
+        path,
+        bytes,
+        fileOptions: FileOptions(
+          contentType: _contentTypeForExtension(ext),
+          upsert: false,
+        ),
+      );
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('bucket not found') ||
+          msg.contains('bucket') && msg.contains('404')) {
+        throw Exception(
+          'Il bucket Storage "$_bucketId" non esiste sul tuo progetto Supabase '
+          '(l’errore non dipende dall’API del punto: le immagini si caricano prima su Storage).\n\n'
+          'Correzione: apri il dashboard Supabase → SQL Editor → incolla ed esegui il file '
+          'supabase/fix_storage_bucket.sql (oppure Storage → New bucket, id esatto: '
+          '$_bucketId, pubblico, max ~5 MB, tipi immagine).',
+        );
+      }
+      rethrow;
+    }
     urls.add(bucket.getPublicUrl(path));
   }
 
