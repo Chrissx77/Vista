@@ -1,11 +1,10 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:vista/HomePage.dart';
-import 'package:vista/log_in_page.dart';
+import 'package:vista/screens/main_shell.dart';
+import 'package:vista/screens/login_page.dart';
 
 class AuthGate extends StatelessWidget {
-  AuthGate({super.key});
+  const AuthGate({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -15,15 +14,16 @@ class AuthGate extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(body: const CircularProgressIndicator());
         }
-        
+
         final session = snapshot.data?.session;
-        
+
         if (session != null) {
-          return const HomePage(title: "Un nuovo punto di Vista");
+          return const MainShell(
+            pointsListTitle: 'Un nuovo punto di Vista',
+          );
         } else {
           return const LoginPage();
         }
-
       },
     );
   }

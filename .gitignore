@@ -1,3 +1,6 @@
+# Local MCP / tooling temp files
+.tmp_apply_migration.json
+
 # Miscellaneous
 *.class
 *.log

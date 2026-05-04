@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:vista/auth/auth_gate.dart';
-import 'package:vista/log_in_page.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:vista/utility/ColorsApp.dart';
+import 'package:vista/screens/auth_gate.dart';
+import 'package:vista/utility/colors_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,7 +12,7 @@ Future<void> main() async {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1dHdpb2t1bXh5aHZkYXFnZHdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3NDE5NzUsImV4cCI6MjA4MTMxNzk3NX0.OAHaFS22BIN3DPMizy98s9j7dnRvC1u9hmTs7cLZeNw',
   );
 
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -23,21 +23,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Vista',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: ColorsApp.primary,
-          primary: ColorsApp.primary,
-          secondary: ColorsApp.secondary,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: ColorsApp.buttonColor,
-            foregroundColor: ColorsApp.secondary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-          ),
-        ),
-      ),
+      theme: ColorsApp.lightTheme(),
       home: AuthGate(),
     );
   }
