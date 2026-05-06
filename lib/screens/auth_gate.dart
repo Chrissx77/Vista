@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:vista/screens/main_shell.dart';
 import 'package:vista/screens/login_page.dart';
+import 'package:vista/screens/main_shell.dart';
+import 'package:vista/utility/colors_app.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -12,18 +13,20 @@ class AuthGate extends StatelessWidget {
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(body: const CircularProgressIndicator());
+          return const Scaffold(
+            backgroundColor: ColorsApp.surface,
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
 
         final session = snapshot.data?.session;
 
         if (session != null) {
           return const MainShell(
-            pointsListTitle: 'Un nuovo punto di Vista',
+            pointsListTitle: 'Esplora',
           );
-        } else {
-          return const LoginPage();
         }
+        return const LoginPage();
       },
     );
   }

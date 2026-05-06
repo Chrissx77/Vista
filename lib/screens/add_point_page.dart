@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:vista/models/pointview.dart';
 import 'package:vista/providers.dart';
 import 'package:vista/services/pointview_images.dart';
+import 'package:vista/utility/colors_app.dart';
 
 class _PickedImage {
   _PickedImage(this.file, this.bytes);
@@ -15,7 +16,7 @@ class _PickedImage {
   final Uint8List bytes;
 }
 
-/// Creazione di un nuovo punto panoramico (T5).
+/// Creazione di un nuovo punto panoramico.
 class AddPointPage extends ConsumerStatefulWidget {
   const AddPointPage({super.key});
 
@@ -24,6 +25,8 @@ class AddPointPage extends ConsumerStatefulWidget {
 }
 
 class _AddPointPageState extends ConsumerState<AddPointPage> {
+  static const int _maxImages = 3;
+
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _region = TextEditingController();
@@ -43,7 +46,7 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostPicks());
   }
 
-  /// Su Android, se il sistema chiude l’app con la galleria aperta, qui si recuperano le foto.
+  /// Su Android, se il sistema chiude l'app con la galleria aperta, qui si recuperano le foto.
   /// Su web / iOS / desktop `retrieveLostData` può non essere implementato: ignoriamo.
   Future<void> _recoverLostPicks() async {
     if (kIsWeb) return;
@@ -62,7 +65,7 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
   Future<void> _appendFromXFiles(List<XFile> files) async {
     final add = <_PickedImage>[];
     for (final x in files) {
-      if (_picked.length + add.length >= 3) break;
+      if (_picked.length + add.length >= _maxImages) break;
       final bytes = await x.readAsBytes();
       add.add(_PickedImage(x, bytes));
     }
@@ -124,11 +127,8 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
     return false;
   }
 
-  /// Apre la **galleria nativa** del telefono (un’immagine per volta, fino a 3).
   Future<void> _addOneFromGallery() async {
-    final remaining = 3 - _picked.length;
-    if (remaining <= 0) return;
-
+    if (_picked.length >= _maxImages) return;
     final x = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 85,
@@ -139,11 +139,8 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
     setState(() => _picked.add(_PickedImage(x, bytes)));
   }
 
-  /// Seleziona più foto in un solo passaggio (dove supportato dal dispositivo).
   Future<void> _addMultipleFromGallery() async {
-    final remaining = 3 - _picked.length;
-    if (remaining <= 0) return;
-
+    if (_picked.length >= _maxImages) return;
     final list = await _picker.pickMultiImage(
       imageQuality: 85,
       requestFullMetadata: false,
@@ -153,7 +150,7 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
   }
 
   Future<void> _addFromCamera() async {
-    if (_picked.length >= 3) return;
+    if (_picked.length >= _maxImages) return;
     if (!await _ensureCameraPermission()) return;
 
     final x = await _picker.pickImage(
@@ -168,6 +165,66 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
 
   void _removeAt(int index) {
     setState(() => _picked.removeAt(index));
+  }
+
+  Future<void> _showImageSourceSheet() async {
+    if (_picked.length >= _maxImages) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: ColorsApp.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: ColorsApp.outline,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined,
+                      color: ColorsApp.primary),
+                  title: const Text('Scegli dalla galleria'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _addOneFromGallery();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.collections_outlined,
+                      color: ColorsApp.primary),
+                  title: const Text('Scegli più foto insieme'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _addMultipleFromGallery();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined,
+                      color: ColorsApp.primary),
+                  title: const Text('Scatta una foto'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _addFromCamera();
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _submit() async {
@@ -245,93 +302,38 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Nuovo punto panoramico')),
+      appBar: AppBar(
+        title: const Text('Nuovo punto'),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+        ),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
-            Text('Immagini', style: textTheme.titleSmall),
-            const SizedBox(height: 4),
-            Text(
-              'Da 1 a 3 foto. «Apri galleria» apre l’album del telefono (una foto per volta).',
-              style: textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
+            _SectionLabel('Foto', subtitle: 'Da 1 a $_maxImages immagini.'),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                for (var i = 0; i < _picked.length; i++)
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.memory(
-                          _picked[i].bytes,
-                          width: 92,
-                          height: 92,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Positioned(
-                        top: -8,
-                        right: -8,
-                        child: Material(
-                          color: scheme.errorContainer,
-                          shape: const CircleBorder(),
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: _saving ? null : () => _removeAt(i),
-                            child: Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: Icon(
-                                Icons.close,
-                                size: 18,
-                                color: scheme.onErrorContainer,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                if (_picked.length < 3) ...[
-                  FilledButton.tonalIcon(
-                    onPressed: _saving ? null : _addOneFromGallery,
-                    icon: const Icon(Icons.photo_library_outlined),
-                    label: Text(
-                      _picked.isEmpty
-                          ? 'Apri galleria'
-                          : 'Aggiungi dalla galleria',
-                    ),
-                  ),
-                  if (_picked.length < 2)
-                    TextButton.icon(
-                      onPressed: _saving ? null : _addMultipleFromGallery,
-                      icon: const Icon(Icons.collections_outlined),
-                      label: const Text('Scegli più foto insieme'),
-                    ),
-                  OutlinedButton.icon(
-                    onPressed: _saving ? null : _addFromCamera,
-                    icon: const Icon(Icons.camera_alt_outlined),
-                    label: const Text('Scatta'),
-                  ),
-                ],
-              ],
+            _ImagesRow(
+              picked: _picked,
+              maxImages: _maxImages,
+              onRemove: _saving ? null : _removeAt,
+              onAdd: _saving ? null : _showImageSourceSheet,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
+            _SectionLabel('Dettagli'),
+            const SizedBox(height: 12),
             TextFormField(
               controller: _name,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Nome del punto'),
+              decoration: const InputDecoration(
+                labelText: 'Nome del punto',
+                prefixIcon: Icon(Icons.tour_outlined),
+              ),
               validator: (v) => _required(v, 'Nome'),
               textInputAction: TextInputAction.next,
             ),
@@ -339,7 +341,10 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
             TextFormField(
               controller: _region,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Regione'),
+              decoration: const InputDecoration(
+                labelText: 'Regione',
+                prefixIcon: Icon(Icons.public_outlined),
+              ),
               validator: (v) => _required(v, 'Regione'),
               textInputAction: TextInputAction.next,
             ),
@@ -347,7 +352,10 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
             TextFormField(
               controller: _city,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Città'),
+              decoration: const InputDecoration(
+                labelText: 'Città',
+                prefixIcon: Icon(Icons.location_city_outlined),
+              ),
               validator: (v) => _required(v, 'Città'),
               textInputAction: TextInputAction.next,
             ),
@@ -362,57 +370,237 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
               maxLines: 4,
               textInputAction: TextInputAction.newline,
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _latitude,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-                signed: true,
-              ),
-              decoration: const InputDecoration(
-                labelText: 'Latitudine (opzionale)',
-                hintText: 'es. 37.5',
-              ),
-              validator: _optionalLatitude,
-              textInputAction: TextInputAction.next,
+            const SizedBox(height: 28),
+            _SectionLabel(
+              'Posizione',
+              subtitle: 'Lascia vuoto se non vuoi condividere le coordinate.',
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _longitude,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-                signed: true,
-              ),
-              decoration: const InputDecoration(
-                labelText: 'Longitudine (opzionale)',
-                hintText: 'es. 15.08',
-              ),
-              validator: _optionalLongitude,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _submit(),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _latitude,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Latitudine',
+                      hintText: 'es. 37.5',
+                    ),
+                    validator: _optionalLatitude,
+                    textInputAction: TextInputAction.next,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _longitude,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Longitudine',
+                      hintText: 'es. 15.08',
+                    ),
+                    validator: _optionalLongitude,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _submit(),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                'Le coordinate aiutano gli altri a raggiungere il punto.',
+                style: textTheme.bodySmall,
+              ),
+            ),
           ],
         ),
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: FilledButton(
-            onPressed: _saving ? null : _submit,
-            child: _saving
-                ? SizedBox(
-                    height: 22,
-                    width: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                  )
-                : const Text('Salva punto'),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          child: SizedBox(
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _submit,
+              child: _saving
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: ColorsApp.onPrimary,
+                      ),
+                    )
+                  : const Text('Salva punto'),
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sub-widgets
+// ---------------------------------------------------------------------------
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.title, {this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: textTheme.titleMedium),
+        if (subtitle != null && subtitle!.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(subtitle!, style: textTheme.bodyMedium),
+        ],
+      ],
+    );
+  }
+}
+
+class _ImagesRow extends StatelessWidget {
+  const _ImagesRow({
+    required this.picked,
+    required this.maxImages,
+    required this.onRemove,
+    required this.onAdd,
+  });
+
+  final List<_PickedImage> picked;
+  final int maxImages;
+  final ValueChanged<int>? onRemove;
+  final VoidCallback? onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final tiles = <Widget>[];
+    for (var i = 0; i < picked.length; i++) {
+      tiles.add(_ImageTile(bytes: picked[i].bytes, onRemove: () => onRemove?.call(i)));
+    }
+    if (picked.length < maxImages) {
+      tiles.add(_AddImageTile(onTap: onAdd));
+    }
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: tiles,
+    );
+  }
+}
+
+class _ImageTile extends StatelessWidget {
+  const _ImageTile({required this.bytes, required this.onRemove});
+
+  final Uint8List bytes;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Image.memory(
+            bytes,
+            width: 100,
+            height: 100,
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned(
+          top: -6,
+          right: -6,
+          child: Material(
+            color: ColorsApp.onSurface,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onRemove,
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(
+                  Icons.close,
+                  size: 16,
+                  color: ColorsApp.onPrimary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddImageTile extends StatelessWidget {
+  const _AddImageTile({required this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: DottedBorderBox(
+        size: 100,
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_photo_alternate_outlined,
+                color: ColorsApp.primary, size: 26),
+            SizedBox(height: 6),
+            Text(
+              'Aggiungi',
+              style: TextStyle(
+                color: ColorsApp.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Box "tratteggiato" sintetizzato con bordo solido + sfondo soft.
+/// Evita dipendenze esterne mantenendo un look minimal.
+class DottedBorderBox extends StatelessWidget {
+  const DottedBorderBox({super.key, required this.size, required this.child});
+
+  final double size;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: ColorsApp.primarySoft,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ColorsApp.primary.withValues(alpha: 0.35)),
+      ),
+      child: child,
     );
   }
 }

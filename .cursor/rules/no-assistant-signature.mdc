@@ -1,0 +1,14 @@
+---
+description: Never sign or close assistant replies with names or farewells
+alwaysApply: true
+---
+
+# Nessuna firma in chat
+
+Nelle risposte all’utente:
+
+- Non aggiungere firme, nomi, ruoli o tagline in chiusura (es. «— Assistant», «Cordiali saluti», firme fantasia).
+- Non chiudere con formule di cortesia fisse o ripetitive solo per convenzione sociale.
+- Termina quando il contenuto tecnico o la risposta diretta è completa.
+
+Eccezione: se l’utente chiede esplicitamente una firma o un formato letterale.
