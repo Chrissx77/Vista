@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:vista/utility/colors_app.dart';
 
-/// Carosello a pagina intera con indicatori (dettaglio punto).
+/// Carosello hero per il dettaglio: immagine grande, counter, indicatori.
 class PointImageCarousel extends StatefulWidget {
-  const PointImageCarousel({super.key, required this.urls});
+  const PointImageCarousel({
+    super.key,
+    required this.urls,
+    this.height = 380,
+  });
 
   final List<String> urls;
+  final double height;
 
   @override
   State<PointImageCarousel> createState() => _PointImageCarouselState();
@@ -30,76 +36,91 @@ class _PointImageCarouselState extends State<PointImageCarousel> {
   Widget build(BuildContext context) {
     if (widget.urls.isEmpty) return const SizedBox.shrink();
 
-    final scheme = Theme.of(context).colorScheme;
-    const height = 240.0;
+    final hasMultiple = widget.urls.length > 1;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            height: height,
-            width: double.infinity,
-            child: PageView.builder(
-              controller: _controller,
-              itemCount: widget.urls.length,
-              onPageChanged: (i) => setState(() => _page = i),
-              itemBuilder: (context, i) {
-                final url = widget.urls[i];
-                return Image.network(
-                  url,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
-                      ),
-                    );
-                  },
-                  errorBuilder: (_, __, ___) => ColoredBox(
-                    color: scheme.surfaceContainerHighest,
-                    child: Center(
-                      child: Icon(
-                        Icons.broken_image_outlined,
-                        size: 48,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
+    return SizedBox(
+      height: widget.height,
+      width: double.infinity,
+      child: Stack(
+        children: [
+          PageView.builder(
+            controller: _controller,
+            itemCount: widget.urls.length,
+            onPageChanged: (i) => setState(() => _page = i),
+            itemBuilder: (context, i) {
+              return Image.network(
+                widget.urls[i],
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Container(color: ColorsApp.surfaceSkeleton);
+                },
+                errorBuilder: (_, __, ___) => Container(
+                  color: ColorsApp.surfaceSkeleton,
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.broken_image_outlined,
+                    size: 48,
+                    color: ColorsApp.iconPlaceholder,
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
-        ),
-        if (widget.urls.length > 1) ...[
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              widget.urls.length,
-              (i) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: i == _page ? 18 : 8,
-                  height: 8,
+          if (hasMultiple)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(4),
-                    color: i == _page
-                        ? scheme.primary
-                        : scheme.outlineVariant,
+                    color: const Color(0x99000000),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${_page + 1} / ${widget.urls.length}',
+                    style: const TextStyle(
+                      color: ColorsApp.onPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          if (hasMultiple)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 36,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(widget.urls.length, (i) {
+                  final selected = i == _page;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: selected ? 22 : 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? ColorsApp.surface
+                          : Colors.white.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  );
+                }),
+              ),
+            ),
         ],
-      ],
+      ),
     );
   }
 }

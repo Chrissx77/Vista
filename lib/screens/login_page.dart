@@ -12,11 +12,12 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool _isPasswordVisible = false;
+  bool _loading = false;
 
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
-  void login() async {
+  Future<void> _login() async {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
@@ -27,22 +28,24 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    setState(() => _loading = true);
     try {
       await AuthController().signIn(email, password);
     } catch (e) {
-      if (mounted) {
-        final scheme = Theme.of(context).colorScheme;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e.toString(),
-              style: TextStyle(color: scheme.onError),
-            ),
-            backgroundColor: scheme.error,
-            behavior: SnackBarBehavior.floating,
+      if (!mounted) return;
+      final scheme = Theme.of(context).colorScheme;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString(),
+            style: TextStyle(color: scheme.onError),
           ),
-        );
-      }
+          backgroundColor: scheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -57,112 +60,129 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
-    final scheme = theme.colorScheme;
 
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 20),
-                Image.asset(
-                  'images/iconaApp.png',
-                  width: 250,
-                  height: 250,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(
-                      Icons.image_not_supported,
-                      size: 100,
-                      color: ColorsApp.iconPlaceholder,
-                    );
-                  },
-                ),
-
-                Text(
-                  'Un nuovo punto di Vista.',
-                  textAlign: TextAlign.center,
-                  style: textTheme.titleSmall,
-                ),
-
-                const SizedBox(height: 40),
-
-                TextField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'esempio@mail.com',
-                    prefixIcon: Icon(Icons.email_outlined),
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 16),
+              Center(
+                child: Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    color: ColorsApp.primarySoft,
+                    borderRadius: BorderRadius.circular(28),
                   ),
-                  keyboardType: TextInputType.emailAddress,
-                ),
-
-                const SizedBox(height: 20),
-
-                TextField(
-                  controller: passwordController,
-                  obscureText: !_isPasswordVisible,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _isPasswordVisible
-                            ? Icons.visibility
-                            : Icons.visibility_off,
-                        color: scheme.outline,
+                  alignment: Alignment.center,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset(
+                      'images/iconaApp.png',
+                      width: 72,
+                      height: 72,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.landscape_outlined,
+                        size: 44,
+                        color: ColorsApp.primary,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
-                        });
-                      },
                     ),
                   ),
                 ),
-
-                const SizedBox(height: 40),
-
-                ElevatedButton(
-                  onPressed: login,
-                  child: SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.7,
-                    child: const Center(
-                      child: Text('ACCEDI'),
+              ),
+              const SizedBox(height: 28),
+              Text(
+                'Bentornato',
+                textAlign: TextAlign.center,
+                style: textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Accedi per scoprire un nuovo punto di Vista.',
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 36),
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  hintText: 'esempio@mail.com',
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: passwordController,
+                obscureText: !_isPasswordVisible,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _login(),
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _isPasswordVisible
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                    onPressed: () => setState(
+                      () => _isPasswordVisible = !_isPasswordVisible,
                     ),
                   ),
                 ),
-                const SizedBox(height: 40),
-
-                Text(
-                  'Non hai ancora un account?',
-                  textAlign: TextAlign.center,
-                  style: textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: _loading ? null : _login,
+                  child: _loading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            color: ColorsApp.onPrimary,
+                            strokeWidth: 2.4,
+                          ),
+                        )
+                      : const Text('Accedi'),
                 ),
-                const SizedBox(height: 10),
-
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SignUpPage(),
-                      ),
-                    );
-                  },
-                  child: SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.7,
-                    child: const Center(
-                      child: Text('REGISTRATI'),
-                    ),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Non hai un account? ',
+                    style: textTheme.bodyMedium,
                   ),
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SignUpPage(),
+                        ),
+                      );
+                    },
+                    child: const Text('Registrati'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
           ),
         ),
       ),
