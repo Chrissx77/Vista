@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("display_name, created_at")
+    .select("display_name, created_at, is_premium")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -42,6 +42,7 @@ Deno.serve(async (req) => {
       email: user.email ?? "",
       display_name: profile?.display_name ?? "",
       created_at: profile?.created_at ?? null,
+      is_premium: profile?.is_premium ?? false,
     },
   });
 });

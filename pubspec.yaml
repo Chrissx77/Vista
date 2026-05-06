@@ -29,6 +29,18 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+  image: ^4.5.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  # Sorgente con zoom: `dart run tool/zoom_app_icon.dart` poi `dart run flutter_launcher_icons`
+  image_path: assets/launcher/icon_source.png
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: assets/launcher/icon_source.png
+  adaptive_icon_foreground_inset: 8
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true

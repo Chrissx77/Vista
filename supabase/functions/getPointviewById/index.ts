@@ -40,11 +40,22 @@ Deno.serve(async (req) => {
   );
 
   const { data, error } = await supabase
-    .from("point_views")
+    .from("point_view_metrics")
     .select(`
       *,
       profiles (
         display_name
+      ),
+      point_view_services(
+        status,
+        point_services_catalog(name, slug, icon)
+      ),
+      point_reviews(
+        id,
+        user_id,
+        rating,
+        review_text,
+        created_at
       )
     `)
     .eq("id", id)

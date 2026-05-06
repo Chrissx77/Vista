@@ -57,7 +57,9 @@ Deno.serve(async (req) => {
     return json({ error: "Servono tra 1 e 3 immagini (URL dopo upload su Storage)" }, 400);
   }
 
-  const { error: insertError } = await supabase.from("point_views").insert({
+  const { data: inserted, error: insertError } = await supabase
+    .from("point_views")
+    .insert({
     name,
     region,
     city,
@@ -70,11 +72,13 @@ Deno.serve(async (req) => {
       : Number(lng),
     created_by: user.id,
     image_urls,
-  });
+  })
+    .select("id")
+    .single();
 
   if (insertError) {
     return json({ error: insertError.message }, 500);
   }
 
-  return json({ ok: true });
+  return json({ ok: true, id: inserted?.id ?? null });
 });

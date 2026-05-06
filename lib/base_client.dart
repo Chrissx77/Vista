@@ -5,21 +5,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vista/const.dart';
 import 'package:vista/models/pointview.dart';
 import 'package:vista/models/profile.dart';
+import 'package:vista/utility/logger.dart';
 
 class BaseClient {
   Map<String, String> _headers() {
     final token = Supabase.instance.client.auth.currentSession?.accessToken;
-    final bearer = (token != null && token.isNotEmpty)
-        ? 'Bearer $token'
-        : 'Bearer $anonKey';
-    return {
+    final headers = <String, String>{
       'Content-Type': 'application/json',
-      'Authorization': bearer,
       'apikey': anonKey,
     };
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
   }
 
-  Future<void> sendPointview(Pointview pointview) async {
+  Future<int> sendPointview(Pointview pointview) async {
     final url = Uri.parse('$baseUrl${functionsApiPath}sendPointview');
     final response = await http.post(
       url,
@@ -28,7 +29,19 @@ class BaseClient {
     );
 
     if (response.statusCode == 200) {
-      return;
+      try {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final id = decoded['id'];
+        if (id is num) return id.toInt();
+        // Compat: alcune versioni della Edge Function rispondono con { ok: true }
+        // senza id. In questo caso consideriamo la creazione riuscita.
+        if (decoded['ok'] == true || decoded['success'] == true) {
+          return -1;
+        }
+      } catch (_) {
+        // Body non JSON ma HTTP 200: trattiamo comunque come successo.
+      }
+      return -1;
     }
     throw Exception(_errorMessageFromResponse(response));
   }
@@ -40,7 +53,7 @@ class BaseClient {
         return decoded['error'].toString();
       }
     } catch (_) {}
-    return 'Errore ${response.statusCode}: ${response.body}';
+    return 'Errore ${response.statusCode}';
   }
 
   Future<List<Pointview>> getPointview() async {
@@ -59,11 +72,11 @@ class BaseClient {
 
         return pointViews;
       } else {
-        print('Errore Server: ${response.statusCode} ${response.body}');
+        appLog('getPointview HTTP ${response.statusCode}');
         return [];
       }
     } catch (e) {
-      print('Errore di rete: $e');
+      appLog('getPointview network error: ${e.runtimeType}');
       return [];
     }
   }
@@ -82,10 +95,10 @@ class BaseClient {
         }
         return null;
       }
-      print('Errore Server getPointviewById: ${response.statusCode} ${response.body}');
+      appLog('getPointviewById HTTP ${response.statusCode}');
       return null;
     } catch (e) {
-      print('Errore di rete getPointviewById: $e');
+      appLog('getPointviewById network error: ${e.runtimeType}');
       return null;
     }
   }
@@ -102,10 +115,10 @@ class BaseClient {
         }
         return null;
       }
-      print('Errore Server getProfile: ${response.statusCode} ${response.body}');
+      appLog('getProfile HTTP ${response.statusCode}');
       return null;
     } catch (e) {
-      print('Errore di rete getProfile: $e');
+      appLog('getProfile network error: ${e.runtimeType}');
       return null;
     }
   }

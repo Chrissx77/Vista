@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vista/app_navigation.dart';
 import 'package:vista/screens/auth_gate.dart';
 import 'package:vista/supabase_env.dart';
 import 'package:vista/utility/colors_app.dart';
@@ -56,6 +57,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: vistaRootNavigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Vista',
       theme: ColorsApp.lightTheme(),

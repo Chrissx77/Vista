@@ -4,6 +4,8 @@ import 'package:vista/models/pointview.dart';
 import 'package:vista/providers.dart';
 import 'package:vista/screens/point_detail_page.dart';
 import 'package:vista/utility/colors_app.dart';
+import 'package:vista/widgets/cached_image.dart';
+import 'package:vista/widgets/favorite_button.dart';
 
 /// Tab principale: ricerca + tendenze + lista punti panoramici.
 class PointsListPage extends ConsumerStatefulWidget {
@@ -18,6 +20,7 @@ class PointsListPage extends ConsumerStatefulWidget {
 class _PointsListPageState extends ConsumerState<PointsListPage> {
   final _searchController = TextEditingController();
   String _query = '';
+  final Set<String> _selectedServiceSlugs = <String>{};
 
   @override
   void dispose() {
@@ -57,6 +60,9 @@ class _PointsListPageState extends ConsumerState<PointsListPage> {
   @override
   Widget build(BuildContext context) {
     final asyncPoints = ref.watch(pointviewsProvider);
+    final asyncTrending = ref.watch(trendingPointviewsProvider);
+    final asyncRecent = ref.watch(recentPointviewsProvider);
+    final isPremium = ref.watch(isPremiumProvider).value ?? false;
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -88,14 +94,48 @@ class _PointsListPageState extends ConsumerState<PointsListPage> {
                         onChanged: (v) =>
                             setState(() => _query = v.trim().toLowerCase()),
                       ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          _ServiceFilterChip(
+                            slug: 'parking',
+                            label: 'Parcheggio',
+                            selected: _selectedServiceSlugs.contains('parking'),
+                            isPremium: isPremium,
+                            onToggle: () => _togglePremiumFilter('parking', isPremium),
+                          ),
+                          _ServiceFilterChip(
+                            slug: 'wc',
+                            label: 'WC',
+                            selected: _selectedServiceSlugs.contains('wc'),
+                            isPremium: isPremium,
+                            onToggle: () => _togglePremiumFilter('wc', isPremium),
+                          ),
+                          _ServiceFilterChip(
+                            slug: 'camping',
+                            label: 'Sosta camper',
+                            selected: _selectedServiceSlugs.contains('camping'),
+                            isPremium: isPremium,
+                            onToggle: () => _togglePremiumFilter('camping', isPremium),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ),
               ...asyncPoints.when(
                 data: (List<Pointview> all) {
-                  final filtered =
-                      all.where((p) => _matches(p, _query)).toList();
+                  var filtered = all
+                      .where((p) => _matches(p, _query))
+                      .toList(growable: false);
+                  if (_selectedServiceSlugs.isNotEmpty && isPremium) {
+                    final byService = ref
+                        .watch(_premiumFilteredPointsProvider(_selectedServiceSlugs))
+                        .value;
+                    if (byService != null) filtered = byService;
+                  }
                   if (all.isEmpty) {
                     return [
                       const SliverFillRemaining(
@@ -125,17 +165,20 @@ class _PointsListPageState extends ConsumerState<PointsListPage> {
                     ];
                   }
 
-                  final trending = filtered.take(3).toList();
-                  final rest = filtered.skip(trending.length).toList();
+                  final trending = asyncTrending.value ?? const <Pointview>[];
+                  final recent = asyncRecent.value ?? const <Pointview>[];
+                  final rest = filtered;
 
                   return [
                     if (_query.isEmpty && trending.isNotEmpty) ...[
                       const SliverToBoxAdapter(
-                        child: _SectionTitle(title: 'In tendenza'),
+                        child: _SectionTitle(title: 'In Tendenza'),
                       ),
                       SliverToBoxAdapter(
                         child: SizedBox(
-                          height: 220,
+                          // 160 immagine + 10 + titolo + 2 + sottotitolo + 4 +
+                          // riga "preferiti" + buffer per textScaler.
+                          height: 252,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             padding:
@@ -149,6 +192,7 @@ class _PointsListPageState extends ConsumerState<PointsListPage> {
                                 rank: i + 1,
                                 title: pv.name ?? '',
                                 subtitle: _subtitleOf(pv),
+                                favoriteCount: pv.favoriteCount,
                                 imageUrl: pv.imageUrls.isNotEmpty
                                     ? pv.imageUrls.first
                                     : null,
@@ -160,6 +204,34 @@ class _PointsListPageState extends ConsumerState<PointsListPage> {
                       ),
                       const SliverToBoxAdapter(child: SizedBox(height: 8)),
                     ],
+                    if (_query.isEmpty && recent.isNotEmpty) ...[
+                      const SliverToBoxAdapter(
+                        child: _SectionTitle(title: 'Aggiunti di recente'),
+                      ),
+                      SliverToBoxAdapter(
+                        child: SizedBox(
+                          height: 248,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: recent.length > 10 ? 10 : recent.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            itemBuilder: (_, i) {
+                              final pv = recent[i];
+                              return _RecentCard(
+                                pointId: pv.id,
+                                title: pv.name ?? '',
+                                subtitle: _subtitleOf(pv),
+                                imageUrl: pv.imageUrls.isNotEmpty
+                                    ? pv.imageUrls.first
+                                    : null,
+                                onTap: () => _openDetail(pv),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
                     SliverToBoxAdapter(
                       child: _SectionTitle(
                         title: _query.isEmpty
@@ -169,15 +241,22 @@ class _PointsListPageState extends ConsumerState<PointsListPage> {
                     ),
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-                      sliver: SliverList.separated(
-                        itemCount:
-                            _query.isEmpty ? rest.length : filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 16),
+                      sliver: SliverGrid.builder(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 0.74,
+                        ),
+                        itemCount: rest.length,
                         itemBuilder: (_, i) {
-                          final pv = _query.isEmpty ? rest[i] : filtered[i];
+                          final pv = rest[i];
                           return _PointCard(
+                            pointId: pv.id,
                             title: pv.name ?? '',
                             subtitle: _subtitleOf(pv),
+                            favoriteCount: pv.favoriteCount,
+                            avgRating: pv.avgRating,
                             imageUrl: pv.imageUrls.isNotEmpty
                                 ? pv.imageUrls.first
                                 : null,
@@ -211,7 +290,30 @@ class _PointsListPageState extends ConsumerState<PointsListPage> {
       ),
     );
   }
+
+  void _togglePremiumFilter(String slug, bool isPremium) {
+    if (!isPremium) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Filtro premium: abilita un account premium per usarlo.'),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      if (_selectedServiceSlugs.contains(slug)) {
+        _selectedServiceSlugs.remove(slug);
+      } else {
+        _selectedServiceSlugs.add(slug);
+      }
+    });
+  }
 }
+
+final _premiumFilteredPointsProvider =
+    FutureProvider.autoDispose.family<List<Pointview>, Set<String>>((ref, slugs) {
+  return ref.read(pointExperienceControllerProvider).getByServiceSlugs(slugs.toList());
+});
 
 // ---------------------------------------------------------------------------
 // Sub-widgets
@@ -300,6 +402,7 @@ class _TrendingCard extends StatelessWidget {
     required this.rank,
     required this.title,
     required this.subtitle,
+    required this.favoriteCount,
     required this.imageUrl,
     required this.onTap,
   });
@@ -307,6 +410,7 @@ class _TrendingCard extends StatelessWidget {
   final int rank;
   final String title;
   final String subtitle;
+  final int favoriteCount;
   final String? imageUrl;
   final VoidCallback onTap;
 
@@ -320,6 +424,7 @@ class _TrendingCard extends StatelessWidget {
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
@@ -355,9 +460,122 @@ class _TrendingCard extends StatelessWidget {
                 style: textTheme.bodySmall,
               ),
             ],
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(
+                  Icons.favorite,
+                  size: 12,
+                  color: ColorsApp.accentRed,
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    '$favoriteCount',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _RecentCard extends StatelessWidget {
+  const _RecentCard({
+    required this.pointId,
+    required this.title,
+    required this.subtitle,
+    required this.imageUrl,
+    required this.onTap,
+  });
+
+  final int? pointId;
+  final String title;
+  final String subtitle;
+  final String? imageUrl;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return SizedBox(
+      width: 160,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: SizedBox(
+                    height: 160,
+                    width: 160,
+                    child: _PointImage(url: imageUrl),
+                  ),
+                ),
+                if (pointId != null)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: FavoriteButton(pointviewId: pointId!),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.titleMedium,
+            ),
+            if (subtitle.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceFilterChip extends StatelessWidget {
+  const _ServiceFilterChip({
+    required this.slug,
+    required this.label,
+    required this.selected,
+    required this.isPremium,
+    required this.onToggle,
+  });
+
+  final String slug;
+  final String label;
+  final bool selected;
+  final bool isPremium;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(isPremium ? label : '$label (Premium)'),
+      selected: selected,
+      onSelected: (_) => onToggle(),
     );
   }
 }
@@ -394,14 +612,20 @@ class _RankRibbon extends StatelessWidget {
 
 class _PointCard extends StatelessWidget {
   const _PointCard({
+    required this.pointId,
     required this.title,
     required this.subtitle,
+    required this.favoriteCount,
+    required this.avgRating,
     required this.imageUrl,
     required this.onTap,
   });
 
+  final int? pointId;
   final String title;
   final String subtitle;
+  final int favoriteCount;
+  final double? avgRating;
   final String? imageUrl;
   final VoidCallback onTap;
 
@@ -429,7 +653,18 @@ class _PointCard extends StatelessWidget {
                 ),
                 child: AspectRatio(
                   aspectRatio: 16 / 10,
-                  child: _PointImage(url: imageUrl),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _PointImage(url: imageUrl),
+                      if (pointId != null)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: FavoriteButton(pointviewId: pointId!),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               Padding(
@@ -443,8 +678,42 @@ class _PointCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.titleMedium,
                     ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 16,
+                          color: Color(0xFFF59E0B),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          avgRating == null
+                              ? 'Nuovo'
+                              : avgRating!.toStringAsFixed(1),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: ColorsApp.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Icon(
+                          Icons.favorite,
+                          size: 14,
+                          color: ColorsApp.accentRed,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$favoriteCount',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: ColorsApp.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                     if (subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Row(
                         children: [
                           const Icon(
@@ -482,35 +751,11 @@ class _PointImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (url == null || url!.isEmpty) {
-      return Container(
-        color: ColorsApp.surfaceSkeleton,
-        alignment: Alignment.center,
-        child: const Icon(
-          Icons.image_outlined,
-          color: ColorsApp.iconPlaceholder,
-          size: 36,
-        ),
-      );
-    }
-    return Image.network(
-      url!,
+    return CachedImage(
+      url: url,
       fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return Container(color: ColorsApp.surfaceSkeleton);
-      },
-      errorBuilder: (_, __, ___) => Container(
-        color: ColorsApp.surfaceSkeleton,
-        alignment: Alignment.center,
-        child: const Icon(
-          Icons.broken_image_outlined,
-          color: ColorsApp.iconPlaceholder,
-          size: 36,
-        ),
-      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vista/utility/colors_app.dart';
+import 'package:vista/widgets/cached_image.dart';
 
 /// Carosello hero per il dettaglio: immagine grande, counter, indicatori.
 class PointImageCarousel extends StatefulWidget {
@@ -48,24 +49,12 @@ class _PointImageCarouselState extends State<PointImageCarousel> {
             itemCount: widget.urls.length,
             onPageChanged: (i) => setState(() => _page = i),
             itemBuilder: (context, i) {
-              return Image.network(
-                widget.urls[i],
+              return CachedImage(
+                url: widget.urls[i],
                 fit: BoxFit.cover,
                 width: double.infinity,
                 height: double.infinity,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return Container(color: ColorsApp.surfaceSkeleton);
-                },
-                errorBuilder: (_, __, ___) => Container(
-                  color: ColorsApp.surfaceSkeleton,
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.broken_image_outlined,
-                    size: 48,
-                    color: ColorsApp.iconPlaceholder,
-                  ),
-                ),
+                iconSize: 48,
               );
             },
           ),

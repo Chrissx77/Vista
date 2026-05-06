@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vista/models/pointview.dart';
 import 'package:vista/providers.dart';
+import 'package:vista/services/location_service.dart';
 import 'package:vista/services/pointview_images.dart';
 import 'package:vista/utility/colors_app.dart';
 
@@ -39,11 +40,21 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
   final ImagePicker _picker = ImagePicker();
 
   bool _saving = false;
+  bool _locating = false;
+  final Set<int> _selectedServiceIds = <int>{};
+  List<Map<String, dynamic>> _catalogServices = const [];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostPicks());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadServices());
+  }
+
+  Future<void> _loadServices() async {
+    final list = await ref.read(pointExperienceControllerProvider).listCatalogServices();
+    if (!mounted) return;
+    setState(() => _catalogServices = list);
   }
 
   /// Su Android, se il sistema chiude l'app con la galleria aperta, qui si recuperano le foto.
@@ -167,6 +178,45 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
     setState(() => _picked.removeAt(index));
   }
 
+  Future<void> _useCurrentLocation() async {
+    if (_locating || _saving) return;
+    setState(() => _locating = true);
+    try {
+      final res = await LocationService.getCurrentPosition();
+      if (!mounted) return;
+      if (!res.isOk) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message ?? 'Posizione non disponibile.'),
+            action: SnackBarAction(
+              label: 'Impostazioni',
+              onPressed: openAppSettings,
+            ),
+          ),
+        );
+        return;
+      }
+      final p = res.position!;
+      _latitude.text = p.latitude.toStringAsFixed(6);
+      _longitude.text = p.longitude.toStringAsFixed(6);
+
+      final names = await LocationService.reverseGeocode(p.latitude, p.longitude);
+      if (!mounted) return;
+      if (_region.text.trim().isEmpty && (names.region ?? '').isNotEmpty) {
+        _region.text = names.region!;
+      }
+      if (_city.text.trim().isEmpty && (names.city ?? '').isNotEmpty) {
+        _city.text = names.city!;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Posizione aggiornata.')),
+      );
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
   Future<void> _showImageSourceSheet() async {
     if (_picked.length >= _maxImages) return;
     await showModalBottomSheet<void>(
@@ -276,7 +326,13 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
         pv.longitude = double.parse(lngText.replaceAll(',', '.'));
       }
 
-      await ref.read(pointviewControllerProvider).create(pv);
+      final pointId = await ref.read(pointviewControllerProvider).create(pv);
+      if (pointId > 0) {
+        await ref.read(pointExperienceControllerProvider).upsertPointServices(
+              pointId: pointId,
+              serviceIds: _selectedServiceIds.toList(),
+            );
+      }
       ref.invalidate(pointviewsProvider);
 
       if (!mounted) return;
@@ -285,6 +341,19 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
       ).showSnackBar(const SnackBar(content: Text('Punto creato.')));
       Navigator.of(context).pop();
     } catch (e) {
+      final msg = e.toString().toLowerCase();
+      final isLegacyMissingIdError =
+          msg.contains('id non restituito') ||
+          msg.contains('creazione punto riuscita ma id non restituito');
+      if (isLegacyMissingIdError) {
+        ref.invalidate(pointviewsProvider);
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Punto creato.')));
+        Navigator.of(context).pop();
+        return;
+      }
       if (!mounted) return;
       final scheme = Theme.of(context).colorScheme;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -376,6 +445,28 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
               subtitle: 'Lascia vuoto se non vuoi condividere le coordinate.',
             ),
             const SizedBox(height: 12),
+            SizedBox(
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: _saving || _locating ? null : _useCurrentLocation,
+                icon: _locating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: ColorsApp.primary,
+                        ),
+                      )
+                    : const Icon(Icons.my_location, size: 18),
+                label: const Text('Usa la mia posizione'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: ColorsApp.primary,
+                  side: const BorderSide(color: ColorsApp.primary),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -419,6 +510,31 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
                 'Le coordinate aiutano gli altri a raggiungere il punto.',
                 style: textTheme.bodySmall,
               ),
+            ),
+            const SizedBox(height: 24),
+            _SectionLabel('Servizi disponibili'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: _catalogServices.map((service) {
+                final id = (service['id'] as num).toInt();
+                final selected = _selectedServiceIds.contains(id);
+                return FilterChip(
+                  label: Text(service['name']?.toString() ?? ''),
+                  selected: selected,
+                  onSelected: _saving
+                      ? null
+                      : (_) {
+                          setState(() {
+                            if (selected) {
+                              _selectedServiceIds.remove(id);
+                            } else {
+                              _selectedServiceIds.add(id);
+                            }
+                          });
+                        },
+                );
+              }).toList(),
             ),
           ],
         ),

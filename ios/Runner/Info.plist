@@ -42,12 +42,32 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Vista usa le foto per i punti panoramici.</string>
+	<string>Vista usa le foto della tua libreria per allegarle ai punti panoramici che condividi.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Vista può scattare foto da associare al punto.</string>
+	<string>Vista usa la fotocamera per scattare foto dei punti panoramici che vuoi condividere.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Vista usa la tua posizione solo quando l'app è aperta per compilare automaticamente regione, città e coordinate del punto che stai aggiungendo.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>maps</string>
+		<string>comgooglemaps</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>vista.deeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>vista</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

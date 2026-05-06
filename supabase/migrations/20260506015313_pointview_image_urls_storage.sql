@@ -34,6 +34,20 @@ create policy "pointview_images_insert_own_folder"
     and split_part(name, '/', 1) = auth.uid()::text
   );
 
+-- Necessario per upsert: senza UPDATE l'upsert su Storage fallisce silenziosamente.
+drop policy if exists "pointview_images_update_own_folder" on storage.objects;
+create policy "pointview_images_update_own_folder"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'pointview-images'
+    and split_part(name, '/', 1) = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'pointview-images'
+    and split_part(name, '/', 1) = auth.uid()::text
+  );
+
 drop policy if exists "pointview_images_delete_own_folder" on storage.objects;
 create policy "pointview_images_delete_own_folder"
   on storage.objects for delete

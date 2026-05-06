@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   );
 
   const { data, error } = await supabase
-    .from("point_views")
+    .from("point_view_metrics")
     .select("*")
     .order("created_at", { ascending: false });
 
