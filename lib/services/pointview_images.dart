@@ -75,3 +75,26 @@ Future<List<String>> uploadPointviewImages(List<XFile> files) async {
 
   return urls;
 }
+
+/// Estrae i path Storage da URL pubblici del bucket `pointview-images`.
+List<String> storagePathsFromPublicUrls(Iterable<String> urls) {
+  const separator = '/storage/v1/object/public/$_bucketId/';
+  final out = <String>[];
+  for (final url in urls) {
+    final idx = url.indexOf(separator);
+    if (idx < 0) continue;
+    final path = url.substring(idx + separator.length);
+    if (path.isNotEmpty) out.add(path);
+  }
+  return out;
+}
+
+/// Elimina oggetti Storage (best-effort).
+Future<void> deletePointviewImagePaths(List<String> paths) async {
+  if (paths.isEmpty) return;
+  try {
+    await Supabase.instance.client.storage.from(_bucketId).remove(paths);
+  } catch (_) {
+    /* best-effort */
+  }
+}

@@ -1,5 +1,9 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vista/auth_sync.dart';
+import 'package:vista/const.dart';
 
 const String _passwordResetRedirect = 'vista://reset-password';
 
@@ -18,6 +22,38 @@ class AuthController {
   }
 
   Future<void> signOut() async {
+    await _supabase.auth.signOut();
+    requestAuthGateSessionSync();
+  }
+
+  /// Elimina account e contenuti collegati tramite Edge Function `delete_account`.
+  Future<void> deleteAccount() async {
+    final token = _supabase.auth.currentSession?.accessToken;
+    if (token == null || token.isEmpty) {
+      throw StateError('Sessione non valida. Accedi di nuovo.');
+    }
+
+    final url = Uri.parse('$baseUrl${functionsApiPath}delete_account');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': anonKey,
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      var message = 'Eliminazione account non riuscita (${response.statusCode}).';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['error'] != null) {
+          message = decoded['error'].toString();
+        }
+      } catch (_) {}
+      throw Exception(message);
+    }
+
     await _supabase.auth.signOut();
     requestAuthGateSessionSync();
   }

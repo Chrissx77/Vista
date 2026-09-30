@@ -68,20 +68,46 @@ class PointExperienceController {
     return rows.cast<Map<String, dynamic>>();
   }
 
+  /// Servizi associati a un punto (join catalogo). Non dipende dalla view metrics.
+  Future<List<PointService>> getServicesForPoint(int pointId) async {
+    final rows = await _supabase
+        .from('point_view_services')
+        .select('status, point_services_catalog(name, slug, icon)')
+        .eq('point_view_id', pointId)
+        .eq('status', 'active');
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(PointService.fromPointJoinJson)
+        .where((s) => s.name.isNotEmpty || s.slug.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  Future<List<PointReview>> getReviewsForPoint(int pointId) async {
+    final rows = await _supabase
+        .from('point_reviews')
+        .select('id, user_id, rating, review_text, created_at')
+        .eq('point_view_id', pointId)
+        .order('created_at', ascending: false);
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(PointReview.fromJson)
+        .toList(growable: false);
+  }
+
   Future<void> upsertPointServices({
     required int pointId,
     required List<int> serviceIds,
   }) async {
     final uid = _supabase.auth.currentUser?.id;
-    if (uid == null) return;
+    if (uid == null) {
+      throw StateError('Devi essere loggato per aggiornare i servizi.');
+    }
     await _supabase
         .from('point_view_services')
         .delete()
         .eq('point_view_id', pointId);
     if (serviceIds.isEmpty) return;
-    await _supabase
-        .from('point_view_services')
-        .insert(
+    await _supabase.from('point_view_services').insert(
           serviceIds
               .map(
                 (serviceId) => {
@@ -117,6 +143,17 @@ class PointExperienceController {
   }) async {
     final uid = _supabase.auth.currentUser?.id;
     if (uid == null) throw StateError('Devi essere loggato.');
+
+    final owned = await _supabase
+        .from('point_views')
+        .select('id')
+        .eq('id', pointId)
+        .eq('created_by', uid)
+        .maybeSingle();
+    if (owned != null) {
+      throw StateError('Non puoi recensire un punto creato da te.');
+    }
+
     final location = await LocationService.getCurrentPosition();
     if (!location.isOk || location.position == null) {
       throw StateError(

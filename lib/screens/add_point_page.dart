@@ -327,13 +327,17 @@ class _AddPointPageState extends ConsumerState<AddPointPage> {
       }
 
       final pointId = await ref.read(pointviewControllerProvider).create(pv);
-      if (pointId > 0) {
+      if (pointId > 0 && _selectedServiceIds.isNotEmpty) {
         await ref.read(pointExperienceControllerProvider).upsertPointServices(
               pointId: pointId,
               serviceIds: _selectedServiceIds.toList(),
             );
       }
       ref.invalidate(pointviewsProvider);
+      ref.invalidate(myPointviewsProvider);
+      if (pointId > 0) {
+        ref.invalidate(pointviewDetailProvider(pointId));
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(

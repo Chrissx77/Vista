@@ -1,11 +1,9 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:vista/legal.dart';
 import 'package:vista/providers.dart';
 import 'package:vista/utility/colors_app.dart';
-
-const _eulaUrl =
-    'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 class SignUpPage extends ConsumerStatefulWidget {
   const SignUpPage({super.key});
@@ -29,13 +27,6 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
     super.dispose();
   }
 
-  Future<void> _openEula() async {
-    final uri = Uri.parse(_eulaUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
   Future<void> _submit() async {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
@@ -49,7 +40,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
     if (!_accepted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Per continuare devi accettare i Termini d\u2019uso.'),
+          content: Text(
+            'Per continuare accetta Termini d\u2019uso e Privacy Policy.',
+          ),
         ),
       );
       return;
@@ -137,10 +130,11 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                 ),
               ),
               const SizedBox(height: 18),
-              _EulaConsent(
+              _LegalConsent(
                 accepted: _accepted,
                 onChanged: (v) => setState(() => _accepted = v),
-                onOpenEula: _openEula,
+                onOpenTerms: openTermsOfUse,
+                onOpenPrivacy: () => openPrivacyPolicy(context),
               ),
               const SizedBox(height: 18),
               SizedBox(
@@ -167,22 +161,58 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
   }
 }
 
-class _EulaConsent extends StatelessWidget {
-  const _EulaConsent({
+class _LegalConsent extends StatefulWidget {
+  const _LegalConsent({
     required this.accepted,
     required this.onChanged,
-    required this.onOpenEula,
+    required this.onOpenTerms,
+    required this.onOpenPrivacy,
   });
 
   final bool accepted;
   final ValueChanged<bool> onChanged;
-  final VoidCallback onOpenEula;
+  final VoidCallback onOpenTerms;
+  final VoidCallback onOpenPrivacy;
+
+  @override
+  State<_LegalConsent> createState() => _LegalConsentState();
+}
+
+class _LegalConsentState extends State<_LegalConsent> {
+  late final TapGestureRecognizer _termsRecognizer;
+  late final TapGestureRecognizer _privacyRecognizer;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsRecognizer = TapGestureRecognizer()..onTap = widget.onOpenTerms;
+    _privacyRecognizer = TapGestureRecognizer()..onTap = widget.onOpenPrivacy;
+  }
+
+  @override
+  void didUpdateWidget(covariant _LegalConsent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _termsRecognizer.onTap = widget.onOpenTerms;
+    _privacyRecognizer.onTap = widget.onOpenPrivacy;
+  }
+
+  @override
+  void dispose() {
+    _termsRecognizer.dispose();
+    _privacyRecognizer.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final linkStyle = textTheme.bodyMedium?.copyWith(
+      color: ColorsApp.primary,
+      fontWeight: FontWeight.w600,
+      decoration: TextDecoration.underline,
+    );
     return InkWell(
-      onTap: () => onChanged(!accepted),
+      onTap: () => widget.onChanged(!widget.accepted),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -190,8 +220,8 @@ class _EulaConsent extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Checkbox(
-              value: accepted,
-              onChanged: (v) => onChanged(v ?? false),
+              value: widget.accepted,
+              onChanged: (v) => widget.onChanged(v ?? false),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
             ),
@@ -204,24 +234,22 @@ class _EulaConsent extends StatelessWidget {
                     const TextSpan(
                       text: 'Accettando crei un account e acconsenti ai ',
                     ),
-                    const TextSpan(
-                      text: 'Termini d\u2019uso (EULA)',
-                      style: TextStyle(
-                        color: ColorsApp.primary,
-                        fontWeight: FontWeight.w600,
-                        decoration: TextDecoration.underline,
-                      ),
+                    TextSpan(
+                      text: 'Termini d\u2019uso',
+                      style: linkStyle,
+                      recognizer: _termsRecognizer,
+                    ),
+                    const TextSpan(text: ' e alla '),
+                    TextSpan(
+                      text: 'Privacy Policy',
+                      style: linkStyle,
+                      recognizer: _privacyRecognizer,
                     ),
                     const TextSpan(text: '.'),
                   ],
                 ),
                 textAlign: TextAlign.left,
               ),
-            ),
-            IconButton(
-              onPressed: onOpenEula,
-              tooltip: 'Apri Termini d\u2019uso',
-              icon: const Icon(Icons.open_in_new, size: 18),
             ),
           ],
         ),

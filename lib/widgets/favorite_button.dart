@@ -36,9 +36,6 @@ class _FavoriteButtonState extends ConsumerState<FavoriteButton> {
           );
       ref.invalidate(myFavoriteIdsProvider);
       ref.invalidate(myFavoritesProvider);
-      // Aggiorna subito ranking e numeri "preferiti" nelle sezioni home.
-      ref.invalidate(trendingPointviewsProvider);
-      ref.invalidate(recentPointviewsProvider);
       ref.invalidate(pointviewsProvider);
     } catch (e) {
       if (!mounted) return;

@@ -168,8 +168,6 @@ class PointDetailPage extends ConsumerWidget {
                       ],
                       _ServicesSection(point: p),
                       const SizedBox(height: 24),
-                      _NearbyAmenitiesSection(point: p),
-                      const SizedBox(height: 24),
                       _ReviewsSection(point: p),
                     ],
                   ),
@@ -215,7 +213,9 @@ class _ServicesSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final services = point.services;
+    final services = point.services
+        .where((s) => s.status == 'active')
+        .toList(growable: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -232,42 +232,18 @@ class _ServicesSection extends ConsumerWidget {
             runSpacing: 8,
             children: services
                 .map(
-                  (s) => InputChip(
-                    label: Text('${s.name} (${s.status})'),
-                    onPressed: () async {
-                      final pointId = point.id;
-                      if (pointId == null) return;
-                      await ref
-                          .read(pointExperienceControllerProvider)
-                          .reportServiceChange(
-                            pointId: pointId,
-                            serviceId: await _serviceIdBySlug(ref, s.slug),
-                            suggestedStatus: s.status == 'active'
-                                ? 'unavailable'
-                                : 'active',
-                          );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Segnalazione inviata.'),
-                          ),
-                        );
-                      }
-                    },
+                  (s) => Chip(
+                    label: Text(
+                      s.name.isNotEmpty ? s.name : s.slug,
+                    ),
+                    backgroundColor: ColorsApp.primarySoft,
+                    side: BorderSide.none,
                   ),
                 )
                 .toList(),
           ),
       ],
     );
-  }
-
-  Future<int> _serviceIdBySlug(WidgetRef ref, String slug) async {
-    final list = await ref
-        .read(pointExperienceControllerProvider)
-        .listCatalogServices();
-    final found = list.firstWhere((e) => e['slug'] == slug);
-    return (found['id'] as num).toInt();
   }
 }
 
@@ -278,6 +254,13 @@ class _ReviewsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final avg = point.avgRating?.toStringAsFixed(1) ?? '—';
+    final currentUid = ref.watch(currentUserIdProvider);
+    final isOwner =
+        currentUid != null &&
+        point.createdBy != null &&
+        point.createdBy == currentUid;
+    final reviews = point.reviews;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -289,24 +272,35 @@ class _ReviewsSection extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 8),
-        ...point.reviews
-            .take(5)
-            .map(
-              (r) => ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: Text('${'★' * r.rating}${'☆' * (5 - r.rating)}'),
-                subtitle: Text(
-                  (r.reviewText ?? '').isEmpty ? 'Nessun testo' : r.reviewText!,
+        if (reviews.isEmpty)
+          const Text('Ancora nessuna recensione.')
+        else
+          ...reviews.take(8).map(
+                (r) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('${'★' * r.rating}${'☆' * (5 - r.rating)}'),
+                  subtitle: Text(
+                    (r.reviewText ?? '').isEmpty
+                        ? 'Nessun testo'
+                        : r.reviewText!,
+                  ),
                 ),
               ),
-            ),
         const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: () => _addReview(context, ref),
-          icon: const Icon(Icons.rate_review_outlined),
-          label: const Text('Lascia recensione'),
-        ),
+        if (isOwner)
+          Text(
+            'Non puoi recensire i tuoi punti.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: ColorsApp.onSurfaceMuted,
+                ),
+          )
+        else
+          OutlinedButton.icon(
+            onPressed: () => _addReview(context, ref),
+            icon: const Icon(Icons.rate_review_outlined),
+            label: const Text('Lascia recensione'),
+          ),
       ],
     );
   }
@@ -314,19 +308,35 @@ class _ReviewsSection extends ConsumerWidget {
   Future<void> _addReview(BuildContext context, WidgetRef ref) async {
     final pointId = point.id;
     if (pointId == null) return;
+    final currentUid = ref.read(currentUserIdProvider);
+    if (currentUid != null &&
+        point.createdBy != null &&
+        point.createdBy == currentUid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Non puoi recensire un punto creato da te.'),
+        ),
+      );
+      return;
+    }
     final lat = point.latitude;
     final lon = point.longitude;
-    if (lat == null || lon == null) return;
+    if (lat == null || lon == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Questo punto non ha coordinate: impossibile recensire.'),
+        ),
+      );
+      return;
+    }
     final canReview = await _isNearPoint(lat, lon);
     if (!context.mounted) return;
     if (!canReview) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Puoi votare solo quando sei entro 100m dal punto.'),
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Puoi votare solo quando sei entro 100m dal punto.'),
+        ),
+      );
       return;
     }
     int rating = 5;
@@ -374,14 +384,22 @@ class _ReviewsSection extends ConsumerWidget {
       ),
     );
     if (confirm != true) return;
-    await ref
-        .read(pointExperienceControllerProvider)
-        .addOrUpdateReview(
-          pointId: pointId,
-          rating: rating,
-          reviewText: textController.text,
-        );
-    ref.invalidate(pointviewDetailProvider(pointId));
+    try {
+      await ref.read(pointExperienceControllerProvider).addOrUpdateReview(
+            pointId: pointId,
+            rating: rating,
+            reviewText: textController.text,
+          );
+      ref.invalidate(pointviewDetailProvider(pointId));
+      ref.invalidate(pointviewsProvider);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      textController.dispose();
+    }
   }
 
   Future<bool> _isNearPoint(double latitude, double longitude) async {
@@ -395,103 +413,6 @@ class _ReviewsSection extends ConsumerWidget {
     final dLon = (p.longitude - longitude) * metersPerDegreeLon;
     final distance = math.sqrt(dLat * dLat + dLon * dLon);
     return distance <= 100;
-  }
-}
-
-class _NearbyAmenitiesSection extends ConsumerStatefulWidget {
-  const _NearbyAmenitiesSection({required this.point});
-  final Pointview point;
-
-  @override
-  ConsumerState<_NearbyAmenitiesSection> createState() =>
-      _NearbyAmenitiesSectionState();
-}
-
-class _NearbyAmenitiesSectionState
-    extends ConsumerState<_NearbyAmenitiesSection> {
-  late Future<List<NearbyAmenity>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    final lat = widget.point.latitude;
-    final lon = widget.point.longitude;
-    if (lat == null || lon == null) {
-      _future = Future.value(const []);
-      return;
-    }
-    _future = ref
-        .read(pointExperienceControllerProvider)
-        .fetchNearbyAmenities(latitude: lat, longitude: lon);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.point.latitude == null || widget.point.longitude == null) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Servizi nelle vicinanze',
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: 8),
-        FutureBuilder<List<NearbyAmenity>>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: LinearProgressIndicator(minHeight: 3),
-              );
-            }
-            final data = snapshot.data ?? const <NearbyAmenity>[];
-            if (data.isEmpty) {
-              return const Text(
-                'Nessun servizio vicino trovato (entro 2.5 km).',
-              );
-            }
-            return Column(
-              children: data
-                  .take(8)
-                  .map(
-                    (a) => ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.near_me_outlined, size: 18),
-                      title: Text(a.name),
-                      subtitle: Text(
-                        '${_kindLabel(a.kind)} · ${a.distanceMeters.toStringAsFixed(0)} m',
-                      ),
-                    ),
-                  )
-                  .toList(),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  String _kindLabel(String kind) {
-    switch (kind) {
-      case 'toilets':
-        return 'WC';
-      case 'drinking_water':
-        return 'Acqua';
-      case 'fuel':
-        return 'Carburante';
-      case 'camp_site':
-        return 'Camping';
-      case 'restaurant':
-        return 'Ristorazione';
-      case 'parking':
-        return 'Parcheggio';
-      default:
-        return kind.replaceAll('_', ' ');
-    }
   }
 }
 

@@ -1,13 +1,24 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vista/models/pointview.dart';
 import 'package:vista/providers.dart';
 import 'package:vista/services/location_service.dart';
+import 'package:vista/services/pointview_images.dart';
 import 'package:vista/utility/colors_app.dart';
+import 'package:vista/widgets/cached_image.dart';
 
-/// Modifica di un pointview esistente: campi testuali + coordinate.
-/// Le immagini esistenti restano invariate (gestione media via creazione).
+class _PickedImage {
+  _PickedImage(this.file, this.bytes);
+  final XFile file;
+  final Uint8List bytes;
+}
+
+/// Modifica di un pointview esistente: campi, coordinate, servizi e foto (1–3).
 class EditPointPage extends ConsumerStatefulWidget {
   const EditPointPage({super.key, required this.pointview});
 
@@ -18,6 +29,8 @@ class EditPointPage extends ConsumerStatefulWidget {
 }
 
 class _EditPointPageState extends ConsumerState<EditPointPage> {
+  static const int _maxImages = 3;
+
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _region;
@@ -30,6 +43,12 @@ class _EditPointPageState extends ConsumerState<EditPointPage> {
   bool _locating = false;
   List<Map<String, dynamic>> _catalogServices = const [];
   final Set<int> _selectedServiceIds = <int>{};
+
+  final List<String> _existingUrls = <String>[];
+  final List<_PickedImage> _picked = <_PickedImage>[];
+  final ImagePicker _picker = ImagePicker();
+
+  int get _totalImages => _existingUrls.length + _picked.length;
 
   @override
   void initState() {
@@ -45,11 +64,13 @@ class _EditPointPageState extends ConsumerState<EditPointPage> {
     _longitude = TextEditingController(
       text: p.longitude == null ? '' : p.longitude.toString(),
     );
+    _existingUrls.addAll(p.imageUrls);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadServices());
   }
 
   Future<void> _loadServices() async {
-    final list = await ref.read(pointExperienceControllerProvider).listCatalogServices();
+    final list =
+        await ref.read(pointExperienceControllerProvider).listCatalogServices();
     final selectedSlugs = widget.pointview.services.map((e) => e.slug).toSet();
     if (!mounted) return;
     setState(() {
@@ -98,6 +119,95 @@ class _EditPointPageState extends ConsumerState<EditPointPage> {
     return null;
   }
 
+  Future<bool> _ensureCameraPermission() async {
+    if (kIsWeb) return true;
+    if (!Platform.isIOS && !Platform.isAndroid) return true;
+    final status = await Permission.camera.request();
+    if (status.isGranted) return true;
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Serve il permesso fotocamera per scattare.'),
+        action: SnackBarAction(
+          label: 'Impostazioni',
+          onPressed: openAppSettings,
+        ),
+      ),
+    );
+    return false;
+  }
+
+  Future<void> _addFromGallery() async {
+    if (_totalImages >= _maxImages) return;
+    final remaining = _maxImages - _totalImages;
+    if (remaining == 1) {
+      final x = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        requestFullMetadata: false,
+      );
+      if (!mounted || x == null) return;
+      final bytes = await x.readAsBytes();
+      setState(() => _picked.add(_PickedImage(x, bytes)));
+      return;
+    }
+    final list = await _picker.pickMultiImage(
+      imageQuality: 85,
+      requestFullMetadata: false,
+    );
+    if (!mounted || list.isEmpty) return;
+    final add = <_PickedImage>[];
+    for (final x in list) {
+      if (_totalImages + add.length >= _maxImages) break;
+      add.add(_PickedImage(x, await x.readAsBytes()));
+    }
+    if (add.isEmpty) return;
+    setState(() => _picked.addAll(add));
+  }
+
+  Future<void> _addFromCamera() async {
+    if (_totalImages >= _maxImages) return;
+    if (!await _ensureCameraPermission()) return;
+    final x = await _picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+      requestFullMetadata: false,
+    );
+    if (!mounted || x == null) return;
+    final bytes = await x.readAsBytes();
+    setState(() => _picked.add(_PickedImage(x, bytes)));
+  }
+
+  Future<void> _showImageSourceSheet() async {
+    if (_totalImages >= _maxImages || _saving) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Galleria'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _addFromGallery();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Fotocamera'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _addFromCamera();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _useCurrentLocation() async {
     if (_locating || _saving) return;
     setState(() => _locating = true);
@@ -119,7 +229,8 @@ class _EditPointPageState extends ConsumerState<EditPointPage> {
       final p = res.position!;
       _latitude.text = p.latitude.toStringAsFixed(6);
       _longitude.text = p.longitude.toStringAsFixed(6);
-      final names = await LocationService.reverseGeocode(p.latitude, p.longitude);
+      final names =
+          await LocationService.reverseGeocode(p.latitude, p.longitude);
       if (!mounted) return;
       if (_region.text.trim().isEmpty && (names.region ?? '').isNotEmpty) {
         _region.text = names.region!;
@@ -134,6 +245,15 @@ class _EditPointPageState extends ConsumerState<EditPointPage> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_totalImages < 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Serve almeno un'immagine (massimo 3)."),
+        ),
+      );
+      return;
+    }
+
     final latEmpty = _latitude.text.trim().isEmpty;
     final lngEmpty = _longitude.text.trim().isEmpty;
     if (latEmpty != lngEmpty) {
@@ -149,6 +269,13 @@ class _EditPointPageState extends ConsumerState<EditPointPage> {
 
     setState(() => _saving = true);
     try {
+      final originalUrls = widget.pointview.imageUrls;
+      final kept = List<String>.from(_existingUrls);
+      final uploaded = _picked.isEmpty
+          ? const <String>[]
+          : await uploadPointviewImages(_picked.map((e) => e.file).toList());
+      final finalUrls = [...kept, ...uploaded];
+
       final updated = Pointview()
         ..id = widget.pointview.id
         ..name = _name.text.trim()
@@ -162,7 +289,8 @@ class _EditPointPageState extends ConsumerState<EditPointPage> {
             : double.parse(_latitude.text.trim().replaceAll(',', '.'))
         ..longitude = lngEmpty
             ? null
-            : double.parse(_longitude.text.trim().replaceAll(',', '.'));
+            : double.parse(_longitude.text.trim().replaceAll(',', '.'))
+        ..imageUrls = finalUrls;
 
       await ref.read(pointviewControllerProvider).update(updated);
       if (widget.pointview.id != null) {
@@ -171,6 +299,9 @@ class _EditPointPageState extends ConsumerState<EditPointPage> {
               serviceIds: _selectedServiceIds.toList(),
             );
       }
+
+      final removed = originalUrls.where((u) => !finalUrls.contains(u));
+      await deletePointviewImagePaths(storagePathsFromPublicUrls(removed));
 
       ref.invalidate(pointviewsProvider);
       ref.invalidate(myPointviewsProvider);
@@ -213,6 +344,38 @@ class _EditPointPageState extends ConsumerState<EditPointPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
+            Text('Foto', style: textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Da 1 a $_maxImages immagini.',
+              style: textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (var i = 0; i < _existingUrls.length; i++)
+                  _ExistingImageTile(
+                    url: _existingUrls[i],
+                    onRemove: _saving
+                        ? null
+                        : () => setState(() => _existingUrls.removeAt(i)),
+                  ),
+                for (var i = 0; i < _picked.length; i++)
+                  _NewImageTile(
+                    bytes: _picked[i].bytes,
+                    onRemove: _saving
+                        ? null
+                        : () => setState(() => _picked.removeAt(i)),
+                  ),
+                if (_totalImages < _maxImages)
+                  _AddImageTile(
+                    onTap: _saving ? null : _showImageSourceSheet,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 24),
             Text('Dettagli', style: textTheme.titleMedium),
             const SizedBox(height: 12),
             TextFormField(
@@ -220,7 +383,7 @@ class _EditPointPageState extends ConsumerState<EditPointPage> {
               textCapitalization: TextCapitalization.words,
               decoration: const InputDecoration(
                 labelText: 'Nome del punto',
-                prefixIcon: Icon(Icons.tour_outlined),
+                prefixIcon: Icon(Icons.landscape_outlined),
               ),
               validator: (v) => _required(v, 'Nome'),
               textInputAction: TextInputAction.next,
@@ -360,6 +523,128 @@ class _EditPointPageState extends ConsumerState<EditPointPage> {
                   : const Text('Salva modifiche'),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExistingImageTile extends StatelessWidget {
+  const _ExistingImageTile({required this.url, required this.onRemove});
+
+  final String url;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            width: 100,
+            height: 100,
+            child: CachedImage(url: url, fit: BoxFit.cover),
+          ),
+        ),
+        if (onRemove != null)
+          Positioned(
+            top: -6,
+            right: -6,
+            child: Material(
+              color: ColorsApp.onSurface,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onRemove,
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.close, size: 16, color: ColorsApp.onPrimary),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _NewImageTile extends StatelessWidget {
+  const _NewImageTile({required this.bytes, required this.onRemove});
+
+  final Uint8List bytes;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Image.memory(
+            bytes,
+            width: 100,
+            height: 100,
+            fit: BoxFit.cover,
+          ),
+        ),
+        if (onRemove != null)
+          Positioned(
+            top: -6,
+            right: -6,
+            child: Material(
+              color: ColorsApp.onSurface,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onRemove,
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.close, size: 16, color: ColorsApp.onPrimary),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _AddImageTile extends StatelessWidget {
+  const _AddImageTile({required this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        width: 100,
+        height: 100,
+        decoration: BoxDecoration(
+          color: ColorsApp.primarySoft,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: ColorsApp.primary.withValues(alpha: 0.35)),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_photo_alternate_outlined,
+                color: ColorsApp.primary, size: 26),
+            SizedBox(height: 6),
+            Text(
+              'Aggiungi',
+              style: TextStyle(
+                color: ColorsApp.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
         ),
       ),
     );

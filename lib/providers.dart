@@ -102,8 +102,20 @@ final profileProvider = FutureProvider.autoDispose.family<Profile?, String?>((
 });
 
 final pointviewDetailProvider =
-    FutureProvider.autoDispose.family<Pointview, int>((ref, id) {
-  return ref.read(pointviewControllerProvider).getById(id);
+    FutureProvider.autoDispose.family<Pointview, int>((ref, id) async {
+  final point = await ref.read(pointviewControllerProvider).getById(id);
+  final experience = ref.read(pointExperienceControllerProvider);
+  try {
+    point.services = await experience.getServicesForPoint(id);
+  } catch (_) {
+    // Mantieni eventuali servizi già presenti dalla Edge Function.
+  }
+  try {
+    point.reviews = await experience.getReviewsForPoint(id);
+  } catch (_) {
+    // Mantieni eventuali recensioni già presenti dalla Edge Function.
+  }
+  return point;
 });
 
 /// Pointview creati dall'utente loggato.

@@ -52,6 +52,7 @@ class PointviewController {
       'description': pointview.description,
       'latitude': pointview.latitude,
       'longitude': pointview.longitude,
+      'image_urls': pointview.imageUrls,
     };
     await _supabase.from('point_views').update(payload).eq('id', id);
   }

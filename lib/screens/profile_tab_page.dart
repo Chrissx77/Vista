@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vista/legal.dart';
 import 'package:vista/models/pointview.dart';
 import 'package:vista/models/profile.dart';
 import 'package:vista/providers.dart';
@@ -204,6 +205,26 @@ class _AccountSection extends ConsumerWidget {
               icon: const Icon(Icons.workspace_premium_outlined),
               label: const Text('Attiva Premium (presto disponibile)'),
             ),
+          const SizedBox(height: 16),
+          Text(
+            'LEGALE',
+            style: textTheme.labelLarge?.copyWith(letterSpacing: 1),
+          ),
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('Termini d\u2019uso'),
+            trailing: const Icon(Icons.open_in_new, size: 18),
+            onTap: openTermsOfUse,
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Privacy Policy'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => openPrivacyPolicy(context),
+          ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () async {
@@ -217,9 +238,59 @@ class _AccountSection extends ConsumerWidget {
             icon: const Icon(Icons.logout, size: 20),
             label: const Text('Esci dall\u2019account'),
           ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => _confirmDeleteAccount(context, ref),
+            style: TextButton.styleFrom(foregroundColor: ColorsApp.error),
+            child: const Text('Elimina account'),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Elimina account'),
+        content: const Text(
+          'Questa azione è definitiva: verranno eliminati i tuoi punti, '
+          'preferiti e l\'account. Non può essere annullata.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Annulla'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: ColorsApp.error),
+            child: const Text('Elimina definitivamente'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    if (!context.mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await ref.read(authControllerProvider).deleteAccount();
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
   }
 }
 
@@ -456,6 +527,8 @@ class _MyPointsSection extends ConsumerWidget {
       await ref.read(pointviewControllerProvider).delete(id);
       ref.invalidate(myPointviewsProvider);
       ref.invalidate(pointviewsProvider);
+      ref.invalidate(myFavoritesProvider);
+      ref.invalidate(myFavoriteIdsProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -499,13 +572,14 @@ class _MyPointsSection extends ConsumerWidget {
               final pv = items[i];
               return _MyPointTile(
                 pointview: pv,
-                onTap: () {
+                onTap: () async {
                   if (pv.id == null) return;
-                  Navigator.of(context).push<void>(
+                  await Navigator.of(context).push<void>(
                     MaterialPageRoute(
                       builder: (_) => PointDetailPage(pointId: pv.id!),
                     ),
                   );
+                  ref.invalidate(myPointviewsProvider);
                 },
                 onEdit: () async {
                   final result = await Navigator.of(context).push<bool>(
@@ -676,13 +750,15 @@ class _SavedPointsSection extends ConsumerWidget {
               final pv = items[i];
               return _SavedPointTile(
                 pointview: pv,
-                onTap: () {
+                onTap: () async {
                   if (pv.id == null) return;
-                  Navigator.of(context).push<void>(
+                  await Navigator.of(context).push<void>(
                     MaterialPageRoute(
                       builder: (_) => PointDetailPage(pointId: pv.id!),
                     ),
                   );
+                  ref.invalidate(myFavoritesProvider);
+                  ref.invalidate(myFavoriteIdsProvider);
                 },
                 onUnsave: () async {
                   final id = pv.id;
@@ -690,6 +766,7 @@ class _SavedPointsSection extends ConsumerWidget {
                   await ref.read(favoritesControllerProvider).remove(id);
                   ref.invalidate(myFavoriteIdsProvider);
                   ref.invalidate(myFavoritesProvider);
+                  ref.invalidate(pointviewsProvider);
                 },
               );
             },

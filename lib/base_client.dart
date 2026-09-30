@@ -33,15 +33,17 @@ class BaseClient {
         final decoded = jsonDecode(response.body) as Map<String, dynamic>;
         final id = decoded['id'];
         if (id is num) return id.toInt();
-        // Compat: alcune versioni della Edge Function rispondono con { ok: true }
-        // senza id. In questo caso consideriamo la creazione riuscita.
-        if (decoded['ok'] == true || decoded['success'] == true) {
-          return -1;
+        if (id is String) {
+          final parsed = int.tryParse(id);
+          if (parsed != null) return parsed;
         }
       } catch (_) {
-        // Body non JSON ma HTTP 200: trattiamo comunque come successo.
+        // fall through
       }
-      return -1;
+      throw Exception(
+        'Creazione punto riuscita ma id non restituito dal server. '
+        'Aggiorna l\'elenco e riprova ad associare i servizi.',
+      );
     }
     throw Exception(_errorMessageFromResponse(response));
   }
